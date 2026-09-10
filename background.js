@@ -72,6 +72,24 @@ async function pool(items, limit, fn) {
   return out;
 }
 
+async function fetchJson(url, timeoutMs) {
+  const ctrl = new AbortController();
+  const to = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(url, { signal: ctrl.signal });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(to);
+  }
+}
+
+function usable(got, chunk) {
+  return Array.isArray(got) && got.length === chunk.length && got.every((x) => typeof x === "string" && x.length);
+}
+
 async function translateBatch(texts, sl, tl) {
   const unique = [];
   const seen = new Set();
@@ -90,16 +108,20 @@ async function translateBatch(texts, sl, tl) {
   }
 
   const chunks = [];
-  for (let i = 0; i < missing.length; i += 8) chunks.push(missing.slice(i, i + 8));
+  for (let i = 0; i < missing.length; i += 6) chunks.push(missing.slice(i, i + 6));
 
-  await pool(chunks, 4, async (chunk) => {
+  await pool(chunks, 2, async (chunk) => {
     let got = await googleGtx(chunk, sl, tl);
-    if (!got) got = await lingva(chunk, sl, tl);
-    if (!got) got = await myMemory(chunk, sl, tl);
+    if (!usable(got, chunk)) got = await lingva(chunk, sl, tl);
+    if (!usable(got, chunk)) got = await myMemory(chunk, sl, tl);
     chunk.forEach((src, i) => {
-      const tr = got?.[i] || src;
-      cache.set(ck(sl, tl, src), tr);
-      map.set(src, tr);
+      const tr = got?.[i];
+      if (typeof tr === "string" && tr.length && tr !== src) {
+        cache.set(ck(sl, tl, src), tr);
+        map.set(src, tr);
+      } else {
+        map.set(src, src);
+      }
     });
   });
 
@@ -112,67 +134,55 @@ async function googleOne(t, sl, tl) {
     sl,
     tl,
     dt: "t",
-    dj: "1",
-    ie: "UTF-8",
-    oe: "UTF-8",
     q: t.slice(0, 1800),
   });
-  const r = await fetch("https://translate.googleapis.com/translate_a/single?" + params);
-  if (!r.ok) return null;
-  const data = await r.json();
+  const data = await fetchJson(
+    "https://translate.googleapis.com/translate_a/single?" + params,
+    7000,
+  );
+  if (!data) return null;
   if (data && Array.isArray(data.sentences)) {
-    return data.sentences.map((s) => s.trans || "").join("");
+    const tr = data.sentences.map((s) => s.trans || "").join("");
+    return tr || null;
   }
   if (Array.isArray(data) && Array.isArray(data[0])) {
-    return data[0].map((row) => row?.[0] || "").join("");
+    const tr = data[0].map((row) => row?.[0] || "").join("");
+    return tr || null;
   }
   return null;
 }
 
 async function googleGtx(texts, sl, tl) {
-  try {
-    const out = await pool(texts, 6, async (t) => {
-      try {
-        return (await googleOne(t, sl, tl)) || t;
-      } catch {
-        return t;
-      }
-    });
-    return out;
-  } catch {
-    return null;
-  }
+  const out = await pool(texts, 3, async (t) => googleOne(t, sl, tl));
+  if (!usable(out, texts)) return null;
+  return out;
 }
 
 async function lingva(texts, sl, tl) {
   const bases = ["https://lingva.ml/api/v1", "https://lingva.garudalinux.org/api/v1"];
-  return pool(texts, 4, async (t) => {
+  const out = await pool(texts, 3, async (t) => {
     const encoded = encodeURIComponent(t.slice(0, 1400));
     for (const base of bases) {
-      try {
-        const r = await fetch(`${base}/${sl}/${tl}/${encoded}`);
-        if (!r.ok) continue;
-        const j = await r.json();
-        if (j?.translation) return j.translation;
-      } catch { /* next */ }
+      const j = await fetchJson(`${base}/${sl}/${tl}/${encoded}`, 8000);
+      if (j?.translation) return j.translation;
     }
-    return t;
+    return null;
   });
+  if (!usable(out, texts)) return null;
+  return out;
 }
 
 async function myMemory(texts, sl, tl) {
-  return pool(texts, 4, async (t) => {
-    try {
-      const q = encodeURIComponent(t.slice(0, 450));
-      const r = await fetch(
-        `https://api.mymemory.translated.net/get?q=${q}&langpair=${encodeURIComponent(sl + "|" + tl)}`,
-      );
-      if (!r.ok) return t;
-      const j = await r.json();
-      const tr = j?.responseData?.translatedText;
-      return tr && !/invalid|query length/i.test(tr) ? tr : t;
-    } catch {
-      return t;
-    }
+  const out = await pool(texts, 3, async (t) => {
+    const q = encodeURIComponent(t.slice(0, 450));
+    const j = await fetchJson(
+      `https://api.mymemory.translated.net/get?q=${q}&langpair=${encodeURIComponent(sl + "|" + tl)}`,
+      8000,
+    );
+    const tr = j?.responseData?.translatedText;
+    if (tr && !/invalid|query length/i.test(tr)) return tr;
+    return null;
   });
+  if (!usable(out, texts)) return null;
+  return out;
 }
