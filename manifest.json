@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "Ясно — живой перевод",
+  "short_name": "Ясно",
+  "version": "1.0.0",
+  "description": "Переводит английские сайты на русский в реальном времени. Новые блоки остаются переведёнными при прокрутке и кликах.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Ясно"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "permissions": ["storage", "activeTab", "scripting", "contextMenus", "tabs"],
+  "host_permissions": [
+    "https://translate.googleapis.com/*",
+    "https://lingva.ml/*",
+    "https://lingva.garudalinux.org/*",
+    "https://api.mymemory.translated.net/*"
+  ],
+  "commands": {
+    "toggle-translate": {
+      "suggested_key": {
+        "default": "Alt+T"
+      },
+      "description": "Включить или выключить перевод страницы"
+    }
+  }
+}

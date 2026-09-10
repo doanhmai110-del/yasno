@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="popup.css" />
+    <title>Ясно</title>
+  </head>
+  <body>
+    <header>
+      <p class="mark">Ясно</p>
+      <p class="sub" id="host">…</p>
+    </header>
+
+    <section class="hero">
+      <p class="status" id="status">Смотрим страницу</p>
+      <button type="button" id="toggle" class="primary">Перевести</button>
+    </section>
+
+    <ul class="rows">
+      <li>
+        <div>
+          <p class="label">Английские сайты сами</p>
+          <p class="hint">Если страница на английском — перевод стартует без клика</p>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="auto" />
+          <span></span>
+        </label>
+      </li>
+      <li>
+        <div>
+          <p class="label">Оригинал по наведению</p>
+          <p class="hint">Наведите курсор на фразу, чтобы увидеть английский</p>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="hover" />
+          <span></span>
+        </label>
+      </li>
+    </ul>
+
+    <footer>
+      <button type="button" id="restore" class="ghost">Вернуть оригинал</button>
+      <p class="kbd">Alt + T</p>
+    </footer>
+    <script src="popup.js"></script>
+  </body>
+</html>
