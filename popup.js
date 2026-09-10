@@ -56,7 +56,7 @@ $("toggle").addEventListener("click", async () => {
   const t = await tab();
   if (t?.id && !(await sendToTab({ type: "YASNO_STATUS" }))) {
     try {
-      await chrome.scripting.executeScript({ target: { tabId: t.id }, files: ["content.js"] });
+      await chrome.scripting.executeScript({ target: { tabId: t.id }, files: ["yasno-core.js", "content.js"] });
       await chrome.scripting.insertCSS({ target: { tabId: t.id }, files: ["content.css"] });
       await sendToTab({ type: "YASNO_START" });
     } catch {
